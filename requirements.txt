@@ -1,0 +1,5 @@
+ultralytics
+pandas
+opencv-python-headless
+gradio
+numpy
