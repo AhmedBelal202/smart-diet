@@ -3,3 +3,5 @@ pandas
 opencv-python-headless
 gradio
 numpy
+pathlib
+torch
