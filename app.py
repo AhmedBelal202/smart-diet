@@ -18,7 +18,7 @@ import torch
 # ============================================================
 
 MODEL_PATH = "best.pt"
-DATA_PATH = "data.xlsx"
+DATA_PATH = "data.csv"
 
 # Detection settings
 CONFIDENCE_THRESHOLD = 0.25
@@ -45,7 +45,7 @@ if not Path(DATA_PATH).exists():
     raise FileNotFoundError(f"❌ Data file not found: {DATA_PATH}")
 
 try:
-    df = pd.read_excel(DATA_PATH)
+    df = pd.read_csv(DATA_PATH)
     df['food_name'] = df['food_name'].str.lower().str.strip()
     
     numeric_cols = ['calories_100g', 'protein_100g', 'carbs_100g', 'fat_100g']
