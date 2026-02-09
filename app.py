@@ -192,12 +192,7 @@ def format_text_output(detections):
             
             for line in lines:
                 output += f"│     {line}\n"
-            
-            output += f"│\n"
-            output += f"│  🎯 Confidence : {det['confidence']:.1%}\n"
-        else:
-            output += f"│  ⚠️  Not found in database\n"
-            output += f"│  🎯 Confidence : {det['confidence']:.1%}\n"
+
         
         output += f"└─" + "─" * 58 + "\n\n"
     
