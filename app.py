@@ -352,7 +352,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Smart Diet AI") as demo:
         label="📊 Nutrition Information (Per 100g)",
         lines=20,
         max_lines=30,
-        show_copy_button=True
+        # show_copy_button=True
     )
     
     # JSON output (COLLAPSED by default - only for backend developers)
