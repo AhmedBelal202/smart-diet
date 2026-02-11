@@ -1,10 +1,3 @@
-"""
-Smart Diet AI - Final Version
-Shows nutrition per 100g as text + annotated image
-JSON hidden in accordion (for backend developers only)
-Duplicate foods are grouped in text output
-"""
-
 import gradio as gr
 import cv2
 import pandas as pd
@@ -323,10 +316,12 @@ def predict_food(image):
         output_img = draw_annotations(img_bgr, detections)
         text_output = format_text_output(detections)
         
-        # Group detections by food name for JSON
+        # ------------------------------------------------------------------
+        # FIXED JSON GENERATION Logic (Groups duplicates)
+        # ------------------------------------------------------------------
         grouped_json = defaultdict(lambda: {
             "boxes": [],
-            "confidence": 0.0,
+            "confidences": [],  # Changed to list
             "calories_100g": 0,
             "protein_100g": 0,
             "carbs_100g": 0,
@@ -337,10 +332,13 @@ def predict_food(image):
         
         for det in detections:
             name = det['name']
+            
+            # Append detection-specific data
             grouped_json[name]['boxes'].append(det['box'])
             grouped_json[name]['confidences'].append(det['confidence'])
-            # Use first detection's nutrition data (all same for same food)
-            if not grouped_json[name]['calories_100g']:
+            
+            # Set nutrition data only once (since it's common for the class)
+            if grouped_json[name]['calories_100g'] == 0 and det['found']:
                 grouped_json[name]['calories_100g'] = det['calories_100g']
                 grouped_json[name]['protein_100g'] = det['protein_100g']
                 grouped_json[name]['carbs_100g'] = det['carbs_100g']
@@ -348,14 +346,14 @@ def predict_food(image):
                 grouped_json[name]['info'] = det['info']
                 grouped_json[name]['found'] = det['found']
         
-        # Convert to list format
+        # Convert dictionary to clean list format
         json_items = []
         for name, data in grouped_json.items():
             json_items.append({
                 "name": name,
                 "count": len(data['boxes']),
                 "boxes": data['boxes'],
-                "confidence": data['confidences'],
+                "confidences": data['confidences'],
                 "calories_100g": data['calories_100g'],
                 "protein_100g": data['protein_100g'],
                 "carbs_100g": data['carbs_100g'],
@@ -367,7 +365,7 @@ def predict_food(image):
         json_result = {
             "success": True,
             "total_detections": len(detections),
-            "total_items": len(json_items),
+            "total_unique_items": len(json_items),
             "items": json_items,
             "note": "All nutrition values are per 100 grams of food"
         }
@@ -446,7 +444,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Smart Diet AI") as demo:
             This JSON output is designed for programmatic access via API.
             Regular users don't need to see this - the text output above is more readable.
             
-            **Note:** Duplicate foods are grouped with all their bounding boxes and confidence scores.
+            **Note:** Duplicate foods are grouped.
             """
         )
         json_output = gr.JSON(label="JSON Output")
