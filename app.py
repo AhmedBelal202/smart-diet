@@ -5,8 +5,6 @@ import numpy as np
 from ultralytics import YOLO
 from pathlib import Path
 import torch
-from collections import defaultdict
-
 
 # ============================================================
 # CONFIGURATION
@@ -143,36 +141,19 @@ def draw_annotations(image, detections):
 def format_text_output(detections):
     """
     Create formatted text output with nutrition info
-    Groups duplicate foods together
     """
     
     if not detections:
         return "❌ No food items detected.\n\nTry uploading a clearer image with visible food items."
-    
-    # Group detections by food name
-    grouped = defaultdict(list)
-    for det in detections:
-        grouped[det['name']].append(det)
     
     # Header
     output = "=" * 60 + "\n"
     output += "🍽️  DETECTED FOOD ITEMS - NUTRITION PER 100g\n"
     output += "=" * 60 + "\n\n"
     
-    # Each unique food item
-    for i, (food_name, items) in enumerate(grouped.items(), 1):
-        # Use first item for nutrition data (all same for same food)
-        det = items[0]
-        
-        # Count how many times this food appears
-        count = len(items)
-        
-        # Header with count if multiple
-        if count > 1:
-            output += f"┌─ [{i}] {det['name'].upper()} (×{count} portions detected)\n"
-        else:
-            output += f"┌─ [{i}] {det['name'].upper()}\n"
-        
+    # Iterate through UNIQUE items
+    for i, det in enumerate(detections, 1):
+        output += f"┌─ [{i}] {det['name'].upper()}\n"
         output += f"│\n"
         
         if det['found']:
@@ -208,20 +189,10 @@ def format_text_output(detections):
                 output += f"│     {line}\n"
             
             output += f"│\n"
-            
-            # Show confidence for each detection if multiple
-            if count > 1:
-                output += f"│  🎯 Detections:\n"
-                for idx, item in enumerate(items, 1):
-                    output += f"│     #{idx}: {item['confidence']:.1%} confidence\n"
-            else:
-                output += f"│  🎯 Confidence : {det['confidence']:.1%}\n"
+            output += f"│  🎯 Confidence : {det['confidence']:.1%}\n"
         else:
             output += f"│  ⚠️  Not found in database\n"
-            if count > 1:
-                output += f"│  🎯 Detected {count} times\n"
-            else:
-                output += f"│  🎯 Confidence : {det['confidence']:.1%}\n"
+            output += f"│  🎯 Confidence : {det['confidence']:.1%}\n"
         
         output += f"└─" + "─" * 58 + "\n\n"
     
@@ -229,24 +200,10 @@ def format_text_output(detections):
     output += "=" * 60 + "\n"
     output += f"📌 SUMMARY\n"
     output += "=" * 60 + "\n"
-    output += f"Total detections: {len(detections)}\n"
-    output += f"Unique food items: {len(grouped)}\n"
-    
-    found_count = sum(1 for items in grouped.values() if items[0]['found'])
-    output += f"Items in database: {found_count}/{len(grouped)}\n"
+    output += f"Total unique items: {len(detections)}\n"
     
     output += "\n💡 Note: All values are per 100 grams.\n"
     output += "   Multiply by your actual portion size to get total nutrition.\n"
-    output += "   Example: 150g × values shown = actual intake\n"
-    
-    # Show portion calculation example if duplicates exist
-    duplicates = [name for name, items in grouped.items() if len(items) > 1]
-    if duplicates:
-        output += f"\n📝 Multiple portions detected:\n"
-        for name in duplicates:
-            count = len(grouped[name])
-            output += f"   • {name}: {count} portions\n"
-        output += "   Tip: If these are separate items, consider their combined weight.\n"
     
     return output
 
@@ -257,10 +214,8 @@ def format_text_output(detections):
 
 def predict_food(image):
     """
-    Detect food and return nutrition per 100g
-    
-    Returns:
-        tuple: (annotated_image, text_output, json_result)
+    Detect food, filter duplicates (keep highest confidence), 
+    and return nutrition per 100g.
     """
     
     if image is None:
@@ -285,8 +240,8 @@ def predict_food(image):
             verbose=False
         )
         
-        # Process detections
-        detections = []
+        # 1. Collect ALL detections first
+        raw_detections = []
         
         for result in results:
             for box in result.boxes:
@@ -310,63 +265,32 @@ def predict_food(image):
                     "found": food_data['found']
                 }
                 
-                detections.append(detection)
+                raw_detections.append(detection)
         
-        # Create outputs
-        output_img = draw_annotations(img_bgr, detections)
-        text_output = format_text_output(detections)
+        # 2. Filter Duplicates: Keep only Highest Confidence per Food Name
+        unique_detections_map = {}
         
-        # ------------------------------------------------------------------
-        # FIXED JSON GENERATION Logic (Groups duplicates)
-        # ------------------------------------------------------------------
-        grouped_json = defaultdict(lambda: {
-            "boxes": [],
-            "confidences": [],  # Changed to list
-            "calories_100g": 0,
-            "protein_100g": 0,
-            "carbs_100g": 0,
-            "fat_100g": 0,
-            "info": "",
-            "found": False
-        })
-        
-        for det in detections:
+        for det in raw_detections:
             name = det['name']
-            
-            # Append detection-specific data
-            grouped_json[name]['boxes'].append(det['box'])
-            grouped_json[name]['confidences'].append(det['confidence'])
-            
-            # Set nutrition data only once (since it's common for the class)
-            if grouped_json[name]['calories_100g'] == 0 and det['found']:
-                grouped_json[name]['calories_100g'] = det['calories_100g']
-                grouped_json[name]['protein_100g'] = det['protein_100g']
-                grouped_json[name]['carbs_100g'] = det['carbs_100g']
-                grouped_json[name]['fat_100g'] = det['fat_100g']
-                grouped_json[name]['info'] = det['info']
-                grouped_json[name]['found'] = det['found']
+            # If we haven't seen this food yet, OR if this new one has higher confidence
+            if name not in unique_detections_map:
+                unique_detections_map[name] = det
+            else:
+                if det['confidence'] > unique_detections_map[name]['confidence']:
+                    unique_detections_map[name] = det
         
-        # Convert dictionary to clean list format
-        json_items = []
-        for name, data in grouped_json.items():
-            json_items.append({
-                "name": name,
-                "count": len(data['boxes']),
-                "boxes": data['boxes'],
-                "confidences": data['confidences'],
-                "calories_100g": data['calories_100g'],
-                "protein_100g": data['protein_100g'],
-                "carbs_100g": data['carbs_100g'],
-                "fat_100g": data['fat_100g'],
-                "info": data['info'],
-                "found": data['found']
-            })
+        # Convert map back to list
+        final_detections = list(unique_detections_map.values())
         
+        # 3. Create outputs using ONLY the unique/best detections
+        output_img = draw_annotations(img_bgr, final_detections)
+        text_output = format_text_output(final_detections)
+        
+        # JSON returns the filtered list (Old structure, no duplicates)
         json_result = {
             "success": True,
-            "total_detections": len(detections),
-            "total_unique_items": len(json_items),
-            "items": json_items,
+            "total_items": len(final_detections),
+            "items": final_detections, 
             "note": "All nutrition values are per 100 grams of food"
         }
         
@@ -443,8 +367,6 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Smart Diet AI") as demo:
             
             This JSON output is designed for programmatic access via API.
             Regular users don't need to see this - the text output above is more readable.
-            
-            **Note:** Duplicate foods are grouped.
             """
         )
         json_output = gr.JSON(label="JSON Output")
