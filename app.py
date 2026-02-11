@@ -326,7 +326,7 @@ def predict_food(image):
         # Group detections by food name for JSON
         grouped_json = defaultdict(lambda: {
             "boxes": [],
-            "confidences": [],
+            "confidence": 0.0,
             "calories_100g": 0,
             "protein_100g": 0,
             "carbs_100g": 0,
@@ -355,7 +355,7 @@ def predict_food(image):
                 "name": name,
                 "count": len(data['boxes']),
                 "boxes": data['boxes'],
-                "confidences": data['confidences'],
+                "confidence": data['confidences'],
                 "calories_100g": data['calories_100g'],
                 "protein_100g": data['protein_100g'],
                 "carbs_100g": data['carbs_100g'],
@@ -367,7 +367,7 @@ def predict_food(image):
         json_result = {
             "success": True,
             "total_detections": len(detections),
-            "unique_items": len(json_items),
+            "total_items": len(json_items),
             "items": json_items,
             "note": "All nutrition values are per 100 grams of food"
         }
