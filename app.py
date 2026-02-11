@@ -323,11 +323,52 @@ def predict_food(image):
         output_img = draw_annotations(img_bgr, detections)
         text_output = format_text_output(detections)
         
-        # JSON keeps ALL detections (unchanged structure)
+        # Group detections by food name for JSON
+        grouped_json = defaultdict(lambda: {
+            "boxes": [],
+            "confidences": [],
+            "calories_100g": 0,
+            "protein_100g": 0,
+            "carbs_100g": 0,
+            "fat_100g": 0,
+            "info": "",
+            "found": False
+        })
+        
+        for det in detections:
+            name = det['name']
+            grouped_json[name]['boxes'].append(det['box'])
+            grouped_json[name]['confidences'].append(det['confidence'])
+            # Use first detection's nutrition data (all same for same food)
+            if not grouped_json[name]['calories_100g']:
+                grouped_json[name]['calories_100g'] = det['calories_100g']
+                grouped_json[name]['protein_100g'] = det['protein_100g']
+                grouped_json[name]['carbs_100g'] = det['carbs_100g']
+                grouped_json[name]['fat_100g'] = det['fat_100g']
+                grouped_json[name]['info'] = det['info']
+                grouped_json[name]['found'] = det['found']
+        
+        # Convert to list format
+        json_items = []
+        for name, data in grouped_json.items():
+            json_items.append({
+                "name": name,
+                "count": len(data['boxes']),
+                "boxes": data['boxes'],
+                "confidences": data['confidences'],
+                "calories_100g": data['calories_100g'],
+                "protein_100g": data['protein_100g'],
+                "carbs_100g": data['carbs_100g'],
+                "fat_100g": data['fat_100g'],
+                "info": data['info'],
+                "found": data['found']
+            })
+        
         json_result = {
             "success": True,
-            "total_items": len(detections),
-            "items": detections,  # All detections, including duplicates
+            "total_detections": len(detections),
+            "unique_items": len(json_items),
+            "items": json_items,
             "note": "All nutrition values are per 100 grams of food"
         }
         
@@ -405,7 +446,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Smart Diet AI") as demo:
             This JSON output is designed for programmatic access via API.
             Regular users don't need to see this - the text output above is more readable.
             
-            **Note:** JSON contains ALL detections including duplicates (each bounding box).
+            **Note:** Duplicate foods are grouped with all their bounding boxes and confidence scores.
             """
         )
         json_output = gr.JSON(label="JSON Output")
