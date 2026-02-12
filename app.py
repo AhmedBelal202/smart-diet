@@ -14,10 +14,10 @@ MODEL_PATH = "best.pt"
 DATA_PATH = "data.csv"
 
 # Detection settings
-CONFIDENCE_THRESHOLD = 0.15
-IOU_THRESHOLD = 0.35
+CONFIDENCE_THRESHOLD = 0.10
+IOU_THRESHOLD = 0.25
 MAX_DETECTIONS = 20
-IMG_SIZE = 640
+IMG_SIZE = 416
 
 
 # ============================================================
