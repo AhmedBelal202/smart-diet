@@ -128,11 +128,8 @@ def draw_annotations(image, detections):
         # Label text
         cv2.putText(output, label, (x1 + 5, y1 - 5), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            
         
-        # Confidence
-        conf_text = f"{confidence:.0%}"
-        cv2.putText(output, conf_text, (x1, y2 + 20), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
     
     # Convert BGR to RGB
     return cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
